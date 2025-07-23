@@ -1,6 +1,6 @@
 livekit-agents
 livekit-plugins-openai
-livekit-plugins-cartesia
+livekit-plugins-elevenlabs
 livekit-plugins-deepgram
 livekit-plugins-silero
 python-dotenv

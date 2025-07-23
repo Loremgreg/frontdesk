@@ -24,7 +24,7 @@ from livekit.agents import (
     cli,
     function_tool,
 )
-from livekit.plugins import cartesia, deepgram, openai, silero
+from livekit.plugins import elevenlabs, deepgram, openai, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 load_dotenv()
@@ -172,7 +172,7 @@ async def entrypoint(ctx: JobContext):
         userdata=Userdata(cal=cal),
         stt=deepgram.STT(),
         llm=openai.LLM(model="gpt-4o", parallel_tool_calls=False, temperature=0.45),
-        tts=cartesia.TTS(voice="39b376fc-488e-4d0c-8b37-e00b72059fdd", speed="fast"),
+        tts=elevenlabs.TTS(model_id="eleven_flash_v2_5"),
         turn_detection=MultilingualModel(),
         vad=silero.VAD.load(),
         max_tool_steps=1,
