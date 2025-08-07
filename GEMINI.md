@@ -4,11 +4,34 @@ Ce document fournit les instructions et le contexte nécessaires pour travailler
 
 ## 1. Contexte du Projet
 
-- **Objectif :** Créer un assistant vocal intelligent pour un cabinet medical (physiotherapie).
+- **Objectif :** Créer un assistant vocal intelligent pour salons de coiffures. 
 - **Fonctionnalités Clés :**
-    - Accueillir les patients au téléphone.
-    - Répondre aux questions fréquentes (horaires, adresse, tarifs, etc.) en utilisant une base de connaissances (RAG).
-    - Gérer les rendez-vous (prise, modification, annulation) via des outils.
+  1. **Accueil téléphonique automatique**  
+     - Répondre aux appels entrants 24h/24 avec un message personnalisé.  
+     - Identifier si l’appel concerne une prise de RDV ou une question générale.
+
+  2. **Compréhension et réponse aux questions fréquentes**  
+     - Répondre vocalement aux demandes courantes :  
+       - Horaires d’ouverture  
+       - Adresse du salon  
+       - Tarifs (coupe, brushing, etc.)  
+       - Disponibilités approximatives  
+     - Utiliser une base de connaissances pré-remplie et personnalisable.
+
+  3. **Prise de rendez-vous intelligente**  
+     - Identifier le type de service demandé (ex : coupe, brushing, couleur).  
+     - Proposer des créneaux disponibles (via Cal.com → Google Calendar).  
+     - Confirmer vocalement et par SMS la date/heure choisie.  
+     - Enregistrer le RDV dans l’agenda via l’API Cal.com.
+
+  4. **Modification et annulation de rendez-vous**  
+     - Permettre aux clients de déplacer ou annuler un RDV existant.  
+     - Rechercher le RDV dans le calendrier par nom/date.  
+     - Mettre à jour ou supprimer le RDV via API.
+
+  5. **Confirmation & suivi automatique**  
+     - Envoyer automatiquement un SMS (ou WhatsApp) de confirmation.  
+     - Transcrire les demandes en texte et les envoyer par email (optionnel).
 - **Persona de l'Agent :** Le ton doit toujours être professionnel, clair, concis et empathique.
 
 ## 2. Pile Technique Principale
@@ -16,7 +39,7 @@ Ce document fournit les instructions et le contexte nécessaires pour travailler
 - **Langage :** Python
 - **Framework d'Agent :** LiveKit Agents
 - **LLM (Cerveau) :** OpenAI `gpt-4o-mini`
-- **STT (Transcription) :** A definir   (#Deepgram `nova-3` (multilingue))
+- **STT (Transcription) :** Deepgram `nova-3` 
 - **TTS (Voix) :** ElevenLabs `eleven_flash_v2_5`
 - **VAD (Détection de voix) :** Silero VAD
 
