@@ -12,6 +12,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from calendar_api import AvailableSlot, CalComCalendar, Calendar, FakeCalendar, SlotUnavailableError
 from dotenv import load_dotenv
+from phone_number_workflow import GetPhoneNumberTask, GetPhoneNumberResult
+from sms_manager import SMSManager
 
 from livekit.agents import (
     Agent,
@@ -37,6 +39,8 @@ class Userdata:
 
 logger = logging.getLogger("front-desk")
 
+# Initialize SMS manager
+sms_manager = SMSManager()
 
 class FrontDeskAgent(Agent):
     def __init__(self, *, timezone: str) -> None:
@@ -76,7 +80,14 @@ class FrontDeskAgent(Agent):
         if not (slot := self._slots_map.get(slot_id)):
             raise ToolError(f"error: slot {slot_id} was not found")
 
+        # Get email address from user
         email_result = await beta.workflows.GetEmailTask(chat_ctx=self.chat_ctx)
+
+        if ctx.speech_handle.interrupted:
+            return
+
+        # Get phone number from user
+        phone_result = await GetPhoneNumberTask(chat_ctx=self.chat_ctx)
 
         if ctx.speech_handle.interrupted:
             return
@@ -92,8 +103,18 @@ class FrontDeskAgent(Agent):
             # Tell the LLM this slot isn't available anymore
             raise ToolError("This slot isn't available anymore") from None
 
+        # Send SMS confirmation in German
         local = slot.start_time.astimezone(self.tz)
-        return f"The appointment was successfully scheduled for {local.strftime('%A, %B %d, %Y at %H:%M %Z')}."
+        appointment_details = f"{local.strftime('%A, %B %d, %Y at %H:%M %Z')}"
+        sms_sent = sms_manager.send_confirmation_sms(phone_result.phone_number, appointment_details, language="de")
+        
+        confirmation_message = f"Der Termin wurde erfolgreich für {appointment_details} vereinbart."
+        if sms_sent:
+            confirmation_message += " Eine Bestätigungs-SMS wurde an Ihre Telefonnummer gesendet."
+        else:
+            confirmation_message += " Wir konnten keine Bestätigungs-SMS an Ihre Telefonnummer senden."
+            
+        return confirmation_message
 
     @function_tool
     async def list_available_slots(

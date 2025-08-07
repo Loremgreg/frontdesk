@@ -6,3 +6,4 @@ livekit-plugins-silero
 python-dotenv
 aiohttp
 pytest
+twilio
