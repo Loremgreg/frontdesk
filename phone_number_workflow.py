@@ -4,15 +4,21 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from livekit import llm, stt, tts, vad
-from livekit.llm.tool_context import ToolError, function_tool
-from livekit.types import NOT_GIVEN, NotGivenOr
-from livekit.voice.agent import AgentTask
-from livekit.voice.events import RunContext
-from livekit.voice.speech_handle import SpeechHandle
+from livekit.agents import (
+    llm,
+    stt,
+    tts,
+    vad,
+    AgentTask,
+    RunContext,
+    ToolError,
+    function_tool,
+)
+from livekit.agents.types import NotGiven, NOT_GIVEN
+from livekit.agents.voice import SpeechHandle
 
 if TYPE_CHECKING:
-    from livekit.voice.agent_session import TurnDetectionMode
+    from livekit.agents.session import TurnDetectionMode
 
 # Regular expression for international phone numbers
 PHONE_REGEX = r'^\+?[1-9]\d{1,14}$'
@@ -24,13 +30,13 @@ class GetPhoneNumberResult:
 class GetPhoneNumberTask(AgentTask[GetPhoneNumberResult]):
     def __init__(
         self,
-        chat_ctx: NotGivenOr[llm.ChatContext] = NOT_GIVEN,
-        turn_detection: NotGivenOr[TurnDetectionMode | None] = NOT_GIVEN,
-        stt: NotGivenOr[stt.STT | None] = NOT_GIVEN,
-        vad: NotGivenOr[vad.VAD | None] = NOT_GIVEN,
-        llm: NotGivenOr[llm.LLM | llm.RealtimeModel | None] = NOT_GIVEN,
-        tts: NotGivenOr[tts.TTS | None] = NOT_GIVEN,
-        allow_interruptions: NotGivenOr[bool] = NOT_GIVEN,
+        chat_ctx: NotGiven[llm.ChatContext] = NOT_GIVEN,
+        turn_detection: NotGiven[TurnDetectionMode | None] = NOT_GIVEN,
+        stt: NotGiven[stt.STT | None] = NOT_GIVEN,
+        vad: NotGiven[vad.VAD | None] = NOT_GIVEN,
+        llm: NotGiven[llm.LLM | llm.RealtimeModel | None] = NOT_GIVEN,
+        tts: NotGiven[tts.TTS | None] = NOT_GIVEN,
+        allow_interruptions: NotGiven[bool] = NOT_GIVEN,
     ) -> None:
         super().__init__(
             instructions=(
@@ -108,7 +114,7 @@ class GetPhoneNumberTask(AgentTask[GetPhoneNumberResult]):
     @function_tool
     async def confirm_phone_number(self, ctx: RunContext) -> None:
         """Validates/confirms the phone number provided by the user."""
-        await ctx.wait_for_playout()
+        await ctx.wait_for_playout() 
         
         if ctx.speech_handle == self._phone_update_speech_handle:
             raise ToolError("error: the user must confirm the phone number explicitly")
