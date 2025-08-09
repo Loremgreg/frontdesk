@@ -24,7 +24,7 @@ class SMSManager:
         Send a confirmation SMS to the specified phone number.
         
         Args:
-            to_phone_number: The recipient's phone number in E.164 format (e.g., +33612345678)
+            to_phone_number: The recipient's phone number in E.164 format (e.g., +491746260679)
             appointment_details: The appointment details to include in the message
             language: The language for the SMS message (default: "de" for German)
             

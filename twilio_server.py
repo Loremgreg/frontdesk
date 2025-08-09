@@ -1,15 +1,14 @@
 import os
 import uuid
 from dotenv import load_dotenv
-from flask import Flask, request, Response
+from quart import Quart, request, Response
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from livekit.api import LiveKitAPI, CreateRoomRequest, AccessToken, VideoGrants
-import asyncio
 
 # Charger les variables d'environnement depuis le fichier .env
 load_dotenv()
 
-app = Flask(__name__)
+app = Quart(__name__)
 
 # Récupérer les credentials LiveKit depuis l'environnement
 livekit_api_key = os.environ.get("LIVEKIT_API_KEY")
@@ -69,6 +68,6 @@ def sms():
 
 if __name__ == "__main__":
     # Assurez-vous que le worker de l'agent est déjà lancé avant de démarrer ce serveur
-    print("Lancement du serveur Twilio sur le port 5000...")
+    print("Lancement du serveur Twilio sur le port 8000...")
     print("Assurez-vous que votre agent LiveKit est en cours d'exécution.")
-    app.run(port=5000)
+    app.run(port=8000)
