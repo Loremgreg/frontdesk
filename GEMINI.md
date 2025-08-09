@@ -211,6 +211,32 @@ sequenceDiagram
       LiveKit-->>Worker: Job terminé
     end
 
+```mermaid
+flowchart TD
+  Caller[Client téléphone]
+  Twilio[Twilio - Numéro]
+  Ngrok[Ngrok - URL publique]
+  Flask[Serveur Flask/Hypercorn]
+  LiveKit[LiveKit Cloud]
+  WorkerPool[Workers enregistrés]
+  Agent[Processus Agent (entrypoint)]
+  STT[Deepgram - STT]
+  LLM[OpenAI - LLM]
+  TTS[ElevenLabs - TTS]
+  Cal[Cal.com API]
+  GCal[Google Calendar]
+    Caller --> Twilio --> Ngrok --> Flask --> LiveKit
+  Flask -. crée room .-> LiveKit
+  LiveKit -->|dispatch job| WorkerPool -->|spawn process| Agent --> LiveKit
+  Twilio -. connecte audio .-> LiveKit
+
+  LiveKit --> Agent
+  Agent --> STT --> Agent
+  Agent --> LLM --> Agent
+  Agent --> Cal --> GCal
+  Agent --> TTS --> LiveKit --> Caller
+```
+
 ## 5. Documentation de Référence LiveKit
 
 En cas de doute sur le fonctionnement de LiveKit Agents, se référer en priorité à ces liens :
