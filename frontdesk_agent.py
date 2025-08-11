@@ -20,12 +20,14 @@ from livekit.agents import (
     Agent,
     AgentSession,
     JobContext,
+    MetricsCollectedEvent,
     RunContext,
     ToolError,
     WorkerOptions,
     beta,
     cli,
     function_tool,
+    metrics,
 )
 from livekit.plugins import elevenlabs, deepgram, openai, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
@@ -225,6 +227,20 @@ async def entrypoint(ctx: JobContext):
         vad=silero.VAD.load(),
         max_tool_steps=1,
     )
+
+    usage_collector = metrics.UsageCollector()
+
+    @session.on("metrics_collected")
+    def _on_metrics_collected(ev: MetricsCollectedEvent):
+        usage_collector.collect(ev.metrics)
+        metrics.log_metrics(ev.metrics)
+
+    async def log_usage():
+        summary = usage_collector.get_summary()
+        logger.info(f"Usage: {summary}")
+
+    ctx.add_shutdown_callback(log_usage)
+
 
     await session.start(agent=FrontDeskAgent(timezone=timezone), room=ctx.room)
 
