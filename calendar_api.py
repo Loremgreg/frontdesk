@@ -40,6 +40,7 @@ class Calendar(Protocol):
         *,
         start_time: datetime.datetime,
         attendee_email: str,
+        user_name: str,
     ) -> None: ...
     async def list_available_slots(
         self, *, start_time: datetime.datetime, end_time: datetime.datetime
@@ -78,7 +79,7 @@ class FakeCalendar(Calendar):
         pass
 
     async def schedule_appointment(
-        self, *, start_time: datetime.datetime, attendee_email: str
+        self, *, start_time: datetime.datetime, attendee_email: str, user_name: str
     ) -> None:
         # fake it by just removing it from our slots list
         self._slots = [slot for slot in self._slots if slot.start_time != start_time]
@@ -147,7 +148,7 @@ class CalComCalendar(Calendar):
             self._logger.info(f"event type id: {self._lk_event_id}")
 
     async def schedule_appointment(
-        self, *, start_time: datetime.datetime, attendee_email: str
+        self, *, start_time: datetime.datetime, attendee_email: str, user_name: str
     ) -> None:
         start_time = start_time.astimezone(datetime.timezone.utc)
 
@@ -157,7 +158,7 @@ class CalComCalendar(Calendar):
             json={
                 "start": start_time.isoformat(),
                 "attendee": {
-                    "name": attendee_email,  # TODO(theomonnom): add name prompt
+                    "name": user_name,
                     "email": attendee_email,
                     "timeZone": self.tz.tzname(None),
                 },

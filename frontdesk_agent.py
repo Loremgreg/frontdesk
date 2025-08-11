@@ -93,11 +93,19 @@ class FrontDeskAgent(Agent):
         if ctx.speech_handle.interrupted:
             return
 
+        # Get user name from user
+        name_result = await GetUserNameTask(chat_ctx=self.chat_ctx)
+
+        if ctx.speech_handle.interrupted:
+            return
+
         ctx.disallow_interruptions()
 
         try:
             await ctx.userdata.cal.schedule_appointment(
-                start_time=slot.start_time, attendee_email=email_result.email_address
+                start_time=slot.start_time,
+                attendee_email=email_result.email_address,
+                user_name=name_result.name,
             )
         except SlotUnavailableError:
             # exceptions other than ToolError are treated as "An internal error occured" for the LLM.
@@ -107,13 +115,21 @@ class FrontDeskAgent(Agent):
         # Send SMS confirmation in German
         local = slot.start_time.astimezone(self.tz)
         appointment_details = f"{local.strftime('%A, %B %d, %Y at %H:%M %Z')}"
-        sms_sent = sms_manager.send_confirmation_sms(phone_result.phone_number, appointment_details, language="de")
-        
-        confirmation_message = f"Der Termin wurde erfolgreich für {appointment_details} vereinbart."
+        sms_sent = sms_manager.send_confirmation_sms(
+            phone_result.phone_number, appointment_details, language="de"
+        )
+
+        confirmation_message = (
+            f"Vielen Dank, {name_result.name}. Der Termin wurde erfolgreich für {appointment_details} vereinbart."
+        )
         if sms_sent:
-            confirmation_message += " Eine Bestätigungs-SMS wurde an Ihre Telefonnummer gesendet."
+            confirmation_message += (
+                " Eine Bestätigungs-SMS wurde an Ihre Telefonnummer gesendet."
+            )
         else:
-            confirmation_message += " Wir konnten keine Bestätigungs-SMS an Ihre Telefonnummer senden."
+            confirmation_message += (
+                " Wir konnten keine Bestätigungs-SMS an Ihre Telefonnummer senden."
+            )
             
         return confirmation_message
 
