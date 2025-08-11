@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 import os
@@ -132,6 +133,15 @@ class FrontDeskAgent(Agent):
         Args:
             range: Determines how far ahead to search for free time slots.
         """
+        # Let the user know we're working on it. This plays audio while we wait for the calendar API.
+        # The task runs in the background and we don't await it.
+        asyncio.create_task(
+            self.chat_ctx.say(
+                "Un instant, je consulte les disponibilités pour vous.",
+                add_to_chat_ctx=False,
+            )
+        )
+
         now = datetime.datetime.now(self.tz)
         lines: list[str] = []
 
