@@ -4,6 +4,7 @@ Script interactif pour converser avec votre agent FrontDesk en utilisant le vrai
 
 import os
 import asyncio
+import traceback
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -36,16 +37,23 @@ async def chat_with_real_calendar():
     
     userdata = Userdata(cal=cal)
     
-    async with _llm_model() as llm, AgentSession(llm=llm, userdata=userdata) as session:
-        # Aucune souscription d'événements : utilisation du debug dans le résultat de session.run()
-
+    # Créer une session avec les mêmes paramètres que dans entrypoint()
+    async with _llm_model() as llm, AgentSession(
+        llm=llm, 
+        userdata=userdata,
+        max_tool_steps=10,  # Paramètre crucial pour permettre plusieurs étapes d'outils
+        preemptive_generation=True  # Correspond à la configuration dans entrypoint()
+    ) as session:
+        # Démarrer l'agent
         await session.start(FrontDeskAgent(timezone=TIMEZONE))
         print("✅ Calendrier Cal.com initialisé avec succès!")
         print("Vous pouvez maintenant discuter avec l'agent en utilisant vos vraies données Cal.com")
+        
         while True:
             user_input = input("\n👤 Vous: ").strip()
             
             if user_input.lower() in ['quit', 'exit', 'q']:
+                # S'assurer que toutes les tâches en cours sont terminées avant de quitter
                 print("👋 Au revoir !")
                 break
             
@@ -53,13 +61,19 @@ async def chat_with_real_calendar():
                 continue
             
             try:
-                result = await session.run(user_input=user_input)
+                # Utiliser un timeout plus long pour permettre aux workflows de se terminer
+                result = await asyncio.wait_for(
+                    session.run(user_input=user_input), 
+                    timeout=120  # 2 minutes devraient être suffisantes pour tous les workflows
+                )
+                
                 # Affiche les événements du résultat et l'assistant
                 if hasattr(result, "events"):
                     for ev in result.events:
                         # Logging brut pour debug
                         print(f"Event DEBUG: {ev}")
-                        # Extraction du message réel (ChatMessageEvent.item ou ev.message)
+                        
+                        # Extraction du message réel
                         msg = getattr(ev, "message", None) or getattr(ev, "item", None)
                         if msg:
                             role = getattr(msg, "role", None)
@@ -72,13 +86,12 @@ async def chat_with_real_calendar():
                                 else:
                                     text = str(content)
                                 print(f"\n🤖 Agent: {text}")
+            except asyncio.TimeoutError:
+                print("❌ Erreur: L'opération a pris trop de temps")
             except Exception as e:
                 print(f"❌ Erreur: {e}")
+                # Afficher la trace complète pour le débogage
+                traceback.print_exc()
 
 if __name__ == "__main__":
     asyncio.run(chat_with_real_calendar())
-
-
-
-
-
