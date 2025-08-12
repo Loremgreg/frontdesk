@@ -176,30 +176,50 @@ class CalComCalendar(Calendar):
     async def list_available_slots(
         self, *, start_time: datetime.datetime, end_time: datetime.datetime
     ) -> list[AvailableSlot]:
-        start_time = start_time.astimezone(datetime.timezone.utc)
-        end_time = end_time.astimezone(datetime.timezone.utc)
-        query = urlencode(
-            {
-                "eventTypeId": self._lk_event_id,
-                "start": start_time.isoformat(),
-                "end": end_time.isoformat(),
-            }
-        )
-        async with self._http_session.get(
-            headers=self._build_headers(api_version="2024-09-04"), url=f"{BASE_URL}slots/?{query}"
-        ) as resp:
-            resp.raise_for_status()
-            raw_data = (await resp.json())["data"]
-
-            available_slots = []
-            for _, slots in raw_data.items():
-                for slot in slots:
-                    start_dt = datetime.datetime.fromisoformat(slot["start"].replace("Z", "+00:00"))
-                    available_slots.append(
-                        AvailableSlot(start_time=start_dt, duration_min=EVENT_DURATION_MIN)
-                    )
-
-        return available_slots
+        try:
+            start_time = start_time.astimezone(datetime.timezone.utc)
+            end_time = end_time.astimezone(datetime.timezone.utc)
+            query = urlencode(
+                {
+                    "eventTypeId": self._lk_event_id,
+                    "start": start_time.isoformat(),
+                    "end": end_time.isoformat(),
+                }
+            )
+            async with self._http_session.get(
+                headers=self._build_headers(api_version="2024-09-04"), url=f"{BASE_URL}slots/?{query}"
+            ) as resp:
+                resp.raise_for_status()
+                response_json = await resp.json()
+                
+                if "data" not in response_json:
+                    self._logger.error(f"Unexpected API response format: {response_json}")
+                    return []
+                    
+                raw_data = response_json["data"]
+                
+                available_slots = []
+                for _, slots in raw_data.items():
+                    if not isinstance(slots, list):
+                        continue
+                        
+                    for slot in slots:
+                        if not isinstance(slot, dict) or "start" not in slot:
+                            continue
+                            
+                        try:
+                            start_dt = datetime.datetime.fromisoformat(slot["start"].replace("Z", "+00:00"))
+                            available_slots.append(
+                                AvailableSlot(start_time=start_dt, duration_min=EVENT_DURATION_MIN)
+                            )
+                        except (ValueError, AttributeError) as e:
+                            self._logger.error(f"Error parsing slot start time: {e}")
+                            continue
+                            
+                return available_slots
+        except Exception as e:
+            self._logger.error(f"Error fetching available slots: {e}")
+            return []
 
     def _build_headers(self, *, api_version: str | None = None) -> dict[str, str]:
         h = {"Authorization": f"Bearer {self._api_key}"}

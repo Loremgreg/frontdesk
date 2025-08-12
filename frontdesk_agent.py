@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from calendar_api import AvailableSlot, CalComCalendar, Calendar, FakeCalendar, SlotUnavailableError
 from dotenv import load_dotenv
 from phone_number_workflow import GetPhoneNumberTask, GetPhoneNumberResult
+from user_name_workflow import GetUserNameTask, GetUserNameResult
 from sms_manager import SMSManager
 
 from livekit.agents import (
@@ -153,12 +154,16 @@ class FrontDeskAgent(Agent):
         """
         # Let the user know we're working on it. This plays audio while we wait for the calendar API.
         # The task runs in the background and we don't await it.
-        asyncio.create_task(
-            self.chat_ctx.say(
-                "Un instant, je consulte les disponibilités pour vous.",
-                add_to_chat_ctx=False,
-            )
-        )
+        async def say_waiting_message():
+            try:
+                await self.chat_ctx.say(
+                    "Un instant, je consulte les disponibilités pour vous.",
+                    add_to_chat_ctx=False,
+                )
+            except Exception as e:
+                logger.error(f"Error in background task: {e}")
+                
+        asyncio.create_task(say_waiting_message())
 
         now = datetime.datetime.now(self.tz)
         lines: list[str] = []
