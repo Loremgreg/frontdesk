@@ -4,6 +4,9 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import phonenumbers
+from phonenumbers.phonenumberutil import NumberParseException
+
 from livekit.agents import (
     llm,
     stt,
@@ -19,9 +22,6 @@ from livekit.agents.voice import SpeechHandle
 
 if TYPE_CHECKING:
     from livekit.agents.session import TurnDetectionMode
-
-# Regular expression for international phone numbers
-PHONE_REGEX = r'^\+?[1-9]\d{1,14}$'
 
 @dataclass
 class GetPhoneNumberResult:
@@ -91,22 +91,24 @@ class GetPhoneNumberTask(AgentTask[GetPhoneNumberResult]):
         self._phone_update_speech_handle = ctx.speech_handle
         phone = phone.strip()
         
-        # Remove all non-digit characters except + at the beginning
-        digits = re.sub(r'[^\d+]', '', phone)
-        
-        # Handle French mobile numbers that start with 0
-        if digits.startswith('0') and len(digits) == 10:
-            digits = '+33' + digits[1:]
-        
-        # Validate the phone number format
-        if not re.match(PHONE_REGEX, digits):
+        # Remove all non-digit characters, keeping an optional leading + for country code
+        digits = re.sub(r"[^\d+]", "", phone)
+
+        try:
+            parsed = phonenumbers.parse(digits, None)
+        except NumberParseException:
             raise ToolError(f"Invalid phone number format: {phone}")
-            
-        self._current_phone_number = digits
-        separated_phone = " ".join(digits)
-        
+
+        if not phonenumbers.is_valid_number(parsed):
+            raise ToolError(f"Invalid phone number format: {phone}")
+
+        formatted = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+
+        self._current_phone_number = formatted
+        separated_phone = " ".join(formatted)
+
         return (
-            f"The phone number has been updated to {digits}\n"
+            f"The phone number has been updated to {formatted}\n"
             f"Repeat the phone number character by character: {separated_phone} if needed\n"
             f"Prompt the user for confirmation, do not call `confirm_phone_number` directly"
         )
