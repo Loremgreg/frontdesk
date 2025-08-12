@@ -10,3 +10,4 @@ twilio
 quart
 hypercorn
 livekit-api
+opentelemetry-exporter-otlp-proto-http
