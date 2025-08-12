@@ -11,3 +11,8 @@ quart
 hypercorn
 livekit-api
 opentelemetry-exporter-otlp-proto-http
+pytest-asyncio
+
+
+
+

@@ -120,8 +120,33 @@ async def test_no_availability() -> None:
         result.expect.skip_next_event_if(type="message", role="assistant")
         result.expect.next_event().is_function_call(name="list_available_slots")
         result.expect.next_event().is_function_call_output()
-        await (
+                await (
             result.expect.next_event()
             .is_message(role="assistant")
             .judge(llm, intent="must say that there is no availability")
         )
+
+
+@pytest.mark.asyncio
+async def test_assistant_greeting() -> None:
+    """
+    Tests if the agent responds with a greeting and offers assistance proactively.
+    """
+    userdata = Userdata(cal=FakeCalendar(timezone=TIMEZONE, slots=[]))
+    async with _llm_model() as llm, AgentSession(llm=llm, userdata=userdata) as session:
+        await session.start(FrontDeskAgent(timezone=TIMEZONE))
+
+        result = await session.run(user_input="Bonjour")
+
+        # Per the agent's instructions, it should not just greet,
+        # but also ask a question to move the conversation forward.
+        await (
+            result.expect.next_event()
+            .is_message(role="assistant")
+            .judge(
+                llm,
+                intent="Makes a friendly introduction, offers assistance, and immediately asks a helpful question to start the booking process.",
+            )
+        )
+
+        result.expect.no_more_events()

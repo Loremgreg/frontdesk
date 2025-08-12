@@ -61,6 +61,7 @@ class FrontDeskAgent(Agent):
                 "When asked for availability, call list_available_slots and offer a few clear, simple options. "
                 "Say things like 'Monday at 2 PM' — avoid timezones, timestamps, and avoid saying 'AM' or 'PM'. "
                 "Use natural phrases like 'in the morning' or 'in the evening', and don’t mention the year unless it’s different from the current one. "
+                "IMPORTANT: When you need to look up information that might take time, like checking the calendar with 'list_available_slots', you MUST first inform the user that you are doing so. For example, say 'Un instant, je consulte les disponibilités pour vous.' and THEN call the function. "
                 "Offer a few options at a time, pause for a response, then guide the user to confirm. "
                 "If the time is no longer available, let them know gently and offer the next options. "
                 "Always keep the conversation flowing — be proactive, human, and focused on helping the user schedule with ease."
@@ -68,6 +69,18 @@ class FrontDeskAgent(Agent):
         )
 
         self._slots_map: dict[str, AvailableSlot] = {}
+
+    async def start(self, ctx: AgentContext) -> None:
+        """
+        Starts the conversation with a greeting and a proactive question
+        without waiting for the user to speak first.
+        """
+        await super().start(ctx)
+        await self.chat_ctx.say(
+            "Bonjour et bienvenue ! Je suis l'assistant du salon. "
+            "Souhaitez-vous prendre un rendez-vous ou avez-vous une question ?",
+            add_to_chat_ctx=False,  # Don't add the initial greeting to the LLM context
+        )
 
     @function_tool
     async def schedule_appointment(
@@ -152,18 +165,7 @@ class FrontDeskAgent(Agent):
         Args:
             range: Determines how far ahead to search for free time slots.
         """
-        # Let the user know we're working on it. This plays audio while we wait for the calendar API.
-        # The task runs in the background and we don't await it.
-        async def say_waiting_message():
-            try:
-                await self.chat_ctx.say(
-                    "Un instant, je consulte les disponibilités pour vous.",
-                    add_to_chat_ctx=False,
-                )
-            except Exception as e:
-                logger.error(f"Error in background task: {e}")
-                
-        asyncio.create_task(say_waiting_message())
+        
 
         now = datetime.datetime.now(self.tz)
         lines: list[str] = []
