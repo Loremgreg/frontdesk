@@ -94,21 +94,27 @@ class GetPhoneNumberTask(AgentTask[GetPhoneNumberResult]):
         # Remove all non-digit characters, keeping an optional leading + for country code
         digits = re.sub(r"[^\d+]", "", phone)
 
+        formatted = None
         try:
-            parsed = phonenumbers.parse(digits, None)
+            parsed = phonenumbers.parse(digits, "DE")
+            if phonenumbers.is_valid_number(parsed):
+                formatted = phonenumbers.format_number(
+                    parsed, phonenumbers.PhoneNumberFormat.E164
+                )
         except NumberParseException:
-            raise ToolError(f"Invalid phone number format: {phone}")
+            pass
 
-        if not phonenumbers.is_valid_number(parsed):
-            raise ToolError(f"Invalid phone number format: {phone}")
+        if formatted:
+            self._current_phone_number = formatted
+            display_number = formatted
+        else:
+            self._current_phone_number = digits
+            display_number = digits
 
-        formatted = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-
-        self._current_phone_number = formatted
-        separated_phone = " ".join(formatted)
+        separated_phone = " ".join(display_number)
 
         return (
-            f"The phone number has been updated to {formatted}\n"
+            f"The phone number has been updated to {display_number} (raw: {digits})\n"
             f"Repeat the phone number character by character: {separated_phone} if needed\n"
             f"Prompt the user for confirmation, do not call `confirm_phone_number` directly"
         )
