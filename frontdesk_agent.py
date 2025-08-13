@@ -262,7 +262,7 @@ async def entrypoint(ctx: JobContext):
         userdata=Userdata(cal=cal),
         preemptive_generation=True,
         stt=deepgram.STT(),
-        llm=openai.LLM(model="gpt-4o", parallel_tool_calls=False, temperature=0.45),
+        llm=openai.LLM(model="gpt-4o-mini", parallel_tool_calls=False, temperature=0.45),
                 tts=elevenlabs.TTS(model="eleven_flash_v2_5"),
         turn_detection=MultilingualModel(),
         vad=silero.VAD.load(),
