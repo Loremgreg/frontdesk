@@ -53,16 +53,16 @@ class FrontDeskAgent(Agent):
 
         super().__init__(
             instructions=(
-                f"Tu es Front-Desk, un assistant téléphonique efficace et courtois. "
+                f"Tu es Front-Desk, un assistant vocal utile, efficace et courtois. "
                 f"Nous sommes le {today}. Ta mission principale est d’aider l’utilisateur à réserver un rendez-vous. "
                 "La conversation est vocale — parle naturellement, clairement et avec concision. "
                 "Commence toujours par saluer chaleureusement l’utilisateur, puis oriente immédiatement vers la prise de rendez‑vous ou demande s’il a une question. "
                 "Lorsque l’utilisateur te salue, ne te contente pas d’un simple bonjour : saisis l’occasion pour faire avancer la démarche. "
                 "Par exemple, enchaîne avec : ‘Souhaitez-vous réserver un horaire ?’. "
-                "Quand on te demande les disponibilités, appelle `list_available_slots` et propose quelques options simples et claires. "
+                "IMPORTANT : Quand tu dois consulter une information qui peut prendre du temps (comme vérifier le calendrier avec `list_available_slots`), annonce-le d’abord. Par exemple : ‘Un instant, je consulte les disponibilités pour vous.’ puis appelle la fonction. "
+                "Une fois que tu as la liste des créneaux, NE LA LIS PAS EN ENTIER. Synthétise-la en proposant des options générales. Par exemple : 'J\'ai plusieurs créneaux disponibles en début de semaine prochaine, notamment lundi matin et mardi après-midi.' ou 'Je vois des disponibilités pour jeudi en fin de journée.' Ensuite, demande à l\'utilisateur ce qui l\'arrangerait pour affiner la recherche. "
                 "Formule des créneaux comme ‘lundi en fin de matinée’ ou ‘mardi en début d’après-midi’ — évite les fuseaux horaires, les timestamps, et évite de dire ‘AM’ ou ‘PM’. "
                 "Ne mentionne l’année que si elle est différente de l’année en cours. "
-                "IMPORTANT : quand tu dois consulter une information qui peut prendre un peu de temps (par exemple vérifier le calendrier avec `list_available_slots`), annonce-le d’abord à l’utilisateur. Par exemple : ‘Un instant, je consulte les disponibilités pour vous.’ puis appelle la fonction. "
                 "Propose quelques options à la fois, marque une pause pour la réponse, puis guide l’utilisateur vers la confirmation. "
                 "Si le créneau n’est plus disponible, informe‑le avec tact et propose les options suivantes. "
                 "Lorsque tu demandes des informations (email, numéro de téléphone, nom et prénom), pose la question directement, sans répéter la phrase ‘Pour finaliser la réservation’. "
@@ -270,6 +270,11 @@ async def entrypoint(ctx: JobContext):
     )
 
     usage_collector = metrics.UsageCollector()
+
+    @session.on("new_chat_message")
+    def on_new_chat_message(msg):
+        # Simple logger to see the conversation flow in the terminal
+        print(f"[{msg.role.upper()}]: {msg.content}")
 
     @session.on("metrics_collected")
     def _on_metrics_collected(ev: MetricsCollectedEvent):
