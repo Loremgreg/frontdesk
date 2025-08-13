@@ -120,3 +120,7 @@ En cas de doute sur le fonctionnement de LiveKit Agents, se référer en priorit
 - **Événements & Erreurs :** [https://docs.livekit.io/agents/build/events/](https://docs.livekit.io/agents/build/events/)
 - **Cycle de vie du Worker :** [https://docs.livekit.io/agents/worker/](https://docs.livekit.io/agents/worker/)
 - **OpenAI LLM integration guide :** [https://docs.livekit.io/agents/integrations/llm/openai/](https://docs.livekit.io/agents/integrations/llm/openai/)
+
+## 5. Analyse des Conversations avec Langfuse
+
+Le projet utilise également Langfuse pour analyser les données de conversations, permettant d'obtenir des insights sur l'interaction avec l'utilisateur et d'optimiser les performances de l'assistant vocal.

@@ -5,6 +5,7 @@ Script interactif pour converser avec votre agent FrontDesk en utilisant le vrai
 import os
 import asyncio
 import traceback
+import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -13,6 +14,10 @@ from livekit.plugins import openai
 
 from calendar_api import CalComCalendar
 from frontdesk_agent import FrontDeskAgent, Userdata
+
+# Configurer le logging pour voir les erreurs détaillées
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("chat_real_calendar")
 
 TIMEZONE = "Europe/Paris"
 
@@ -32,8 +37,17 @@ async def chat_with_real_calendar():
         print("❌ Erreur: CAL_API_KEY n'est pas définie dans les variables d'environnement")
         return
     
+    # Utiliser les mêmes paramètres que dans entrypoint() de frontdesk_agent.py
     cal = CalComCalendar(api_key=cal_api_key, timezone=TIMEZONE)
-    await cal.initialize()
+    
+    # Attendre explicitement l'initialisation du calendrier
+    try:
+        await cal.initialize()
+        logger.info("Calendar initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing calendar: {e}")
+        print(f"❌ Erreur d'initialisation du calendrier: {e}")
+        return
     
     userdata = Userdata(cal=cal)
     
@@ -44,8 +58,9 @@ async def chat_with_real_calendar():
         max_tool_steps=10,  # Paramètre crucial pour permettre plusieurs étapes d'outils
         preemptive_generation=True  # Correspond à la configuration dans entrypoint()
     ) as session:
-        # Démarrer l'agent
-        await session.start(FrontDeskAgent(timezone=TIMEZONE))
+        # Démarrer l'agent avec le même timezone que le calendrier
+        agent = FrontDeskAgent(timezone=TIMEZONE)
+        await session.start(agent)
         print("✅ Calendrier Cal.com initialisé avec succès!")
         print("Vous pouvez maintenant discuter avec l'agent en utilisant vos vraies données Cal.com")
         
@@ -53,7 +68,6 @@ async def chat_with_real_calendar():
             user_input = input("\n👤 Vous: ").strip()
             
             if user_input.lower() in ['quit', 'exit', 'q']:
-                # S'assurer que toutes les tâches en cours sont terminées avant de quitter
                 print("👋 Au revoir !")
                 break
             
@@ -73,6 +87,11 @@ async def chat_with_real_calendar():
                         # Logging brut pour debug
                         print(f"Event DEBUG: {ev}")
                         
+                        # Capture et log les erreurs de fonction
+                        if hasattr(ev, "type") and ev.type == "function_call_output":
+                            if hasattr(ev.item, "is_error") and ev.item.is_error:
+                                logger.error(f"Function error: {ev.item.output}")
+                        
                         # Extraction du message réel
                         msg = getattr(ev, "message", None) or getattr(ev, "item", None)
                         if msg:
@@ -89,9 +108,18 @@ async def chat_with_real_calendar():
             except asyncio.TimeoutError:
                 print("❌ Erreur: L'opération a pris trop de temps")
             except Exception as e:
+                logger.error(f"Error during conversation: {e}")
                 print(f"❌ Erreur: {e}")
                 # Afficher la trace complète pour le débogage
                 traceback.print_exc()
 
 if __name__ == "__main__":
-    asyncio.run(chat_with_real_calendar())
+    # Utiliser un gestionnaire d'exceptions pour capturer les erreurs non gérées
+    try:
+        asyncio.run(chat_with_real_calendar())
+    except KeyboardInterrupt:
+        print("\n👋 Au revoir !")
+    except Exception as e:
+        logger.critical(f"Unhandled exception: {e}")
+        traceback.print_exc()
+        print(f"❌ Erreur critique: {e}")

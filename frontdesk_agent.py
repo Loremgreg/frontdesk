@@ -53,7 +53,7 @@ class FrontDeskAgent(Agent):
 
         super().__init__(
             instructions=(
-                f"Tu es Front-Desk, un assistant vocal utile, efficace et courtois. "
+                f"Tu es Front-Desk, un assistant téléphonique efficace et courtois. "
                 f"Nous sommes le {today}. Ta mission principale est d’aider l’utilisateur à réserver un rendez-vous. "
                 "La conversation est vocale — parle naturellement, clairement et avec concision. "
                 "Commence toujours par saluer chaleureusement l’utilisateur, puis oriente immédiatement vers la prise de rendez‑vous ou demande s’il a une question. "
@@ -73,10 +73,10 @@ class FrontDeskAgent(Agent):
 
         self._slots_map: dict[str, AvailableSlot] = {}
 
-    async def start(self, ctx: AgentContext) -> None:
+    async def start(self, ctx: AgentSession) -> None:
         """
-        Starts the conversation with a greeting and a proactive question
-        without waiting for the user to speak first.
+        Commence toujours par saluer chaleureusement l’utilisateur, 
+        puis oriente immédiatement vers la prise de rendez‑vous ou demande s’il a une question
         """
         await super().start(ctx)
         await self.chat_ctx.say(
