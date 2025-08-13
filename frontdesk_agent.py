@@ -261,7 +261,7 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession[Userdata](
         userdata=Userdata(cal=cal),
         preemptive_generation=True,
-        stt=deepgram.STT(),
+        stt=deepgram.STT(language="fr", endpointing_ms=500),
         llm=openai.LLM(model="gpt-4o-mini", parallel_tool_calls=False, temperature=0.45),
                 tts=elevenlabs.TTS(model="eleven_flash_v2_5"),
         turn_detection=MultilingualModel(),
