@@ -110,68 +110,132 @@ class CalComCalendar(Calendar):
         self._logger = logging.getLogger("cal.com")
 
     async def initialize(self) -> None:
-        async with self._http_session.get(
-            headers=self._build_headers(api_version="2024-06-14"), url=f"{BASE_URL}me/"
-        ) as resp:
-            resp.raise_for_status()
-            username = (await resp.json())["data"]["username"]
-            self._logger.info(f"using cal.com username: {username}")
+        self._logger.info("🔧 Initializing Cal.com calendar integration...")
+        self._logger.info(f"🌐 Base URL: {BASE_URL}")
+        self._logger.info(f"🔑 API Key present: {bool(self._api_key)}")
+        self._logger.info(f"🔑 API Key prefix: {self._api_key[:10] if self._api_key else 'None'}...")
+        
+        try:
+            # Test API connection and get user info
+            self._logger.info("👤 Fetching user information...")
+            async with self._http_session.get(
+                headers=self._build_headers(api_version="2024-06-14"), url=f"{BASE_URL}me/"
+            ) as resp:
+                self._logger.info(f"📡 /me/ response status: {resp.status}")
+                resp.raise_for_status()
+                user_data = await resp.json()
+                self._logger.info(f"👤 User data received: {user_data}")
+                username = user_data["data"]["username"]
+                self._logger.info(f"✅ Using cal.com username: {username}")
 
-        query = urlencode({"username": username})
-        async with self._http_session.get(
-            headers=self._build_headers(api_version="2024-06-14"),
-            url=f"{BASE_URL}event-types/?{query}",
-        ) as resp:
-            resp.raise_for_status()
-            data = (await resp.json())["data"]
-            lk_event_type = next(
-                (event for event in data if event.get("slug") == CAL_COM_EVENT_TYPE), None
-            )
+            # Get or create event type
+            self._logger.info(f"📅 Looking for event type: {CAL_COM_EVENT_TYPE}")
+            query = urlencode({"username": username})
+            async with self._http_session.get(
+                headers=self._build_headers(api_version="2024-06-14"),
+                url=f"{BASE_URL}event-types/?{query}",
+            ) as resp:
+                self._logger.info(f"📡 /event-types/ response status: {resp.status}")
+                resp.raise_for_status()
+                event_types_data = await resp.json()
+                self._logger.info(f"📅 Event types data: {event_types_data}")
+                data = event_types_data["data"]
+                lk_event_type = next(
+                    (event for event in data if event.get("slug") == CAL_COM_EVENT_TYPE), None
+                )
 
-            if lk_event_type:
-                self._lk_event_id = lk_event_type["id"]
-            else:
-                async with self._http_session.post(
-                    headers=self._build_headers(api_version="2024-06-14"),
-                    url=f"{BASE_URL}event-types",
-                    json={
+                if lk_event_type:
+                    self._lk_event_id = lk_event_type["id"]
+                    self._logger.info(f"✅ Found existing event type: {lk_event_type}")
+                else:
+                    self._logger.info(f"🆕 Creating new event type: {CAL_COM_EVENT_TYPE}")
+                    create_payload = {
                         "lengthInMinutes": EVENT_DURATION_MIN,
                         "title": "LiveKit Front-Desk",
                         "slug": CAL_COM_EVENT_TYPE,
-                    },
-                ) as resp:
-                    resp.raise_for_status()
-                    self._logger.info(f"successfully added {CAL_COM_EVENT_TYPE} event type")
-                    data = (await resp.json())["data"]
-                    self._lk_event_id = data["id"]
+                    }
+                    self._logger.info(f"📋 Create event type payload: {create_payload}")
+                    
+                    async with self._http_session.post(
+                        headers=self._build_headers(api_version="2024-06-14"),
+                        url=f"{BASE_URL}event-types",
+                        json=create_payload,
+                    ) as resp:
+                        self._logger.info(f"📡 Create event type response status: {resp.status}")
+                        resp.raise_for_status()
+                        create_response = await resp.json()
+                        self._logger.info(f"🆕 Event type created: {create_response}")
+                        self._logger.info(f"✅ Successfully added {CAL_COM_EVENT_TYPE} event type")
+                        data = create_response["data"]
+                        self._lk_event_id = data["id"]
 
-            self._logger.info(f"event type id: {self._lk_event_id}")
+                self._logger.info(f"🎯 Final event type ID: {self._lk_event_id}")
+                self._logger.info("✅ Cal.com calendar initialization completed successfully!")
+                
+        except Exception as e:
+            self._logger.error(f"💥 Cal.com initialization failed: {type(e).__name__}: {e}")
+            raise
 
     async def schedule_appointment(
         self, *, start_time: datetime.datetime, attendee_email: str, user_name: str
     ) -> None:
         start_time = start_time.astimezone(datetime.timezone.utc)
-
-        async with self._http_session.post(
-            headers=self._build_headers(api_version="2024-08-13"),
-            url=f"{BASE_URL}bookings",
-            json={
-                "start": start_time.isoformat(),
-                "attendee": {
-                    "name": user_name,
-                    "email": attendee_email,
-                    "timeZone": self.tz.tzname(None),
-                },
-                "eventTypeId": self._lk_event_id,
+        
+        payload = {
+            "start": start_time.isoformat(),
+            "attendee": {
+                "name": user_name,
+                "email": attendee_email,
+                "timeZone": self.tz.tzname(None),
             },
-        ) as resp:
-            data = await resp.json()
-            if error := data.get("error"):
-                message = error["message"]
-                if "User either already has booking at this time or is not available" in message:
-                    raise SlotUnavailableError(error["message"])
+            "eventTypeId": self._lk_event_id,
+        }
+        
+        self._logger.info(f"🚀 Attempting to create booking with payload: {payload}")
+        self._logger.info(f"📅 Booking URL: {BASE_URL}bookings")
+        self._logger.info(f"🔑 Using event type ID: {self._lk_event_id}")
 
-            resp.raise_for_status()
+        try:
+            async with self._http_session.post(
+                headers=self._build_headers(api_version="2024-08-13"),
+                url=f"{BASE_URL}bookings",
+                json=payload,
+            ) as resp:
+                self._logger.info(f"📡 HTTP Response Status: {resp.status}")
+                
+                # Lire la réponse
+                response_text = await resp.text()
+                self._logger.info(f"📄 Raw response: {response_text}")
+                
+                try:
+                    data = await resp.json() if response_text else {}
+                except Exception as json_error:
+                    self._logger.error(f"❌ Failed to parse JSON response: {json_error}")
+                    self._logger.error(f"Raw response was: {response_text}")
+                    raise
+                
+                self._logger.info(f"📋 Parsed Cal.com response: {data}")
+                
+                if error := data.get("error"):
+                    message = error["message"]
+                    self._logger.error(f"❌ Cal.com API error: {message}")
+                    self._logger.error(f"Full error details: {error}")
+                    if "User either already has booking at this time or is not available" in message:
+                        raise SlotUnavailableError(error["message"])
+                    # Raise other errors too
+                    raise Exception(f"Cal.com API error: {message}")
+
+                # Check HTTP status
+                if resp.status >= 400:
+                    self._logger.error(f"❌ HTTP Error {resp.status}: {response_text}")
+                    resp.raise_for_status()
+                
+                self._logger.info("✅ Booking created successfully in Cal.com!")
+                self._logger.info(f"📋 Booking details: {data}")
+                
+        except Exception as e:
+            self._logger.error(f"💥 Exception during booking creation: {type(e).__name__}: {e}")
+            raise
 
     async def list_available_slots(
         self, *, start_time: datetime.datetime, end_time: datetime.datetime

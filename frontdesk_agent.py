@@ -65,9 +65,11 @@ class FrontDeskAgent(Agent):
                 "Ne mentionne l’année que si elle est différente de l’année en cours. "
                 "Propose quelques options à la fois, marque une pause pour la réponse, puis guide l’utilisateur vers la confirmation. "
                 "Si le créneau n’est plus disponible, informe‑le avec tact et propose les options suivantes. "
-                "Lorsque tu demandes des informations (email, numéro de téléphone, nom et prénom), pose la question directement, sans répéter la phrase ‘Pour finaliser la réservation’. "
-                "Exemples : ‘Pourriez‑vous me fournir votre adresse email ?’, ‘Pourriez‑vous également me fournir votre numéro de téléphone ?’, ‘Pourriez‑vous me donner votre nom et prénom, s’il vous plaît ?’. "
-                "Garde toujours la conversation fluide — sois proactif, naturel et centré sur l’objectif : aider l’utilisateur à réserver facilement."
+                "Lorsque tu demandes des informations (email, numéro de téléphone, nom et prénom), pose la question directement, sans répéter la phrase 'Pour finaliser la réservation'. "
+                "Exemples : 'Pourriez‑vous me fournir votre adresse email ?', 'Pourriez‑vous également me fournir votre numéro de téléphone ?', 'Pourriez‑vous me donner votre nom et prénom, s'il vous plaît ?'. "
+                "IMPORTANT pour les emails : Si tu ne comprends pas bien une adresse email, demande poliment à l'utilisateur de l'épeler lettre par lettre. "
+                "Si une information n'est pas claire, dis explicitement : 'Je n'ai pas bien compris, pouvez-vous répéter plus lentement ?' "
+                "Garde toujours la conversation fluide — sois proactif, naturel et centré sur l'objectif : aider l'utilisateur à réserver facilement."
             )
         )
 
@@ -100,57 +102,52 @@ class FrontDeskAgent(Agent):
         if not (slot := self._slots_map.get(slot_id)):
             raise ToolError(f"error: slot {slot_id} was not found")
 
-        # Get email address from user
-        email_result = await beta.workflows.GetEmailTask(chat_ctx=self.chat_ctx)
-
-        if ctx.speech_handle.interrupted:
-            return
-
-        # Get phone number from user
-        phone_result = await GetPhoneNumberTask(chat_ctx=self.chat_ctx)
-
-        if ctx.speech_handle.interrupted:
-            return
-
-        # Get user name from user
-        name_result = await GetUserNameTask(chat_ctx=self.chat_ctx)
-
-        if ctx.speech_handle.interrupted:
-            return
-
+        # Disable interruptions at the beginning to prevent workflow issues
         ctx.disallow_interruptions()
-
+        
         try:
+            # Collect all information without allowing interruptions
+            email_result = await beta.workflows.GetEmailTask(chat_ctx=self.chat_ctx)
+            phone_result = await GetPhoneNumberTask(chat_ctx=self.chat_ctx)
+            name_result = await GetUserNameTask(chat_ctx=self.chat_ctx)
+            
+            # Schedule the appointment
             await ctx.userdata.cal.schedule_appointment(
                 start_time=slot.start_time,
                 attendee_email=email_result.email_address,
                 user_name=name_result.name,
             )
-        except SlotUnavailableError:
-            # exceptions other than ToolError are treated as "An internal error occured" for the LLM.
-            # Tell the LLM this slot isn't available anymore
-            raise ToolError("This slot isn't available anymore") from None
-
-        # Send SMS confirmation in German
-        local = slot.start_time.astimezone(self.tz)
-        appointment_details = f"{local.strftime('%A, %B %d, %Y at %H:%M %Z')}"
-        sms_sent = sms_manager.send_confirmation_sms(
-            phone_result.phone_number, appointment_details, language="de"
-        )
-
-        confirmation_message = (
-            f"Vielen Dank, {name_result.name}. Der Termin wurde erfolgreich für {appointment_details} vereinbart."
-        )
-        if sms_sent:
-            confirmation_message += (
-                " Eine Bestätigungs-SMS wurde an Ihre Telefonnummer gesendet."
-            )
-        else:
-            confirmation_message += (
-                " Wir konnten keine Bestätigungs-SMS an Ihre Telefonnummer senden."
-            )
             
-        return confirmation_message
+            # Send SMS confirmation in German
+            local = slot.start_time.astimezone(self.tz)
+            appointment_details = f"{local.strftime('%A, %B %d, %Y at %H:%M %Z')}"
+            sms_sent = sms_manager.send_confirmation_sms(
+                phone_result.phone_number, appointment_details, language="de"
+            )
+
+            confirmation_message = (
+                f"Vielen Dank, {name_result.name}. Der Termin wurde erfolgreich für {appointment_details} vereinbart."
+            )
+            if sms_sent:
+                confirmation_message += (
+                    " Eine Bestätigungs-SMS wurde an Ihre Telefonnummer gesendet."
+                )
+            else:
+                confirmation_message += (
+                    " Wir konnten keine Bestätigungs-SMS an Ihre Telefonnummer senden."
+                )
+                
+            return confirmation_message
+            
+        except SlotUnavailableError:
+            # Re-enable interruptions before raising error
+            ctx.allow_interruptions()
+            raise ToolError("This slot isn't available anymore") from None
+        except Exception as e:
+            # Re-enable interruptions in case of any other error
+            ctx.allow_interruptions()
+            logger.error(f"Erreur lors de la réservation: {e}")
+            raise ToolError(f"Je rencontre un problème technique lors de la réservation. Pouvez-vous réessayer ?") from None
 
     @function_tool
     async def list_available_slots(
@@ -232,12 +229,19 @@ def setup_langfuse(
         )
         return
 
+    # SÉCURITÉ: Éviter d'exposer les credentials dans os.environ
+    # Créer l'auth header directement sans le stocker dans les variables d'environnement système
     langfuse_auth = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode()
-    os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = f"{host.rstrip('/')}/api/public/otel"
-    os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {langfuse_auth}"
+    endpoint = f"{host.rstrip('/')}/api/public/otel"
+    headers = {"Authorization": f"Basic {langfuse_auth}"}
 
+    # Configurer l'exporter directement avec les headers sécurisés
     trace_provider = TracerProvider()
-    trace_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    exporter = OTLPSpanExporter(
+        endpoint=endpoint,
+        headers=headers
+    )
+    trace_provider.add_span_processor(BatchSpanProcessor(exporter))
     set_tracer_provider(trace_provider)
 
 
@@ -246,22 +250,45 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect()
 
     timezone = "utc"
-
-    if cal_api_key := os.getenv("CAL_API_KEY", None):
-        logger.info("CAL_API_KEY detected, using cal.com calendar")
+    
+    # Debug: Vérifier les variables d'environnement
+    cal_api_key = os.getenv("CAL_API_KEY", None)
+    logger.info("🔍 Checking calendar configuration...")
+    logger.info(f"🔑 CAL_API_KEY present: {bool(cal_api_key)}")
+    if cal_api_key:
+        logger.info(f"🔑 CAL_API_KEY prefix: {cal_api_key[:10]}...")
+    
+    if cal_api_key:
+        logger.info("✅ CAL_API_KEY detected, using Cal.com calendar")
         cal = CalComCalendar(api_key=cal_api_key, timezone=timezone)
+        logger.info("📅 CalComCalendar instance created")
     else:
         logger.warning(
-            "CAL_API_KEY is not set. Falling back to FakeCalendar; set CAL_API_KEY to enable Cal.com integration."
+            "⚠️  CAL_API_KEY is not set. Falling back to FakeCalendar; set CAL_API_KEY to enable Cal.com integration."
         )
         cal = FakeCalendar(timezone=timezone)
+        logger.info("🎭 FakeCalendar instance created")
 
-    await cal.initialize()
+    logger.info("🔧 Initializing calendar...")
+    try:
+        await cal.initialize()
+        logger.info("✅ Calendar initialization completed successfully")
+    except Exception as e:
+        logger.error(f"💥 Calendar initialization failed: {type(e).__name__}: {e}")
+        logger.error("🎭 Falling back to FakeCalendar due to initialization error")
+        cal = FakeCalendar(timezone=timezone)
+        await cal.initialize()
+        logger.info("✅ FakeCalendar fallback initialized")
 
     session = AgentSession[Userdata](
         userdata=Userdata(cal=cal),
         preemptive_generation=True,
-        stt=deepgram.STT(language="fr", endpointing_ms=500),
+        stt=deepgram.STT(
+            language="fr",
+            endpointing_ms=1200,  # Augmenté de 500 à 1200ms pour les emails
+            punctuate=True,
+            smart_format=True
+        ),
         llm=openai.LLM(model="gpt-4o-mini", parallel_tool_calls=False, temperature=0.45),
                 tts=elevenlabs.TTS(model="eleven_flash_v2_5"),
         turn_detection=MultilingualModel(),
