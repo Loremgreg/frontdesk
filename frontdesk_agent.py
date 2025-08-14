@@ -60,7 +60,7 @@ class FrontDeskAgent(Agent):
                 "Lorsque l’utilisateur te salue, ne te contente pas d’un simple bonjour : saisis l’occasion pour faire avancer la démarche. "
                 "Par exemple, enchaîne avec : ‘Souhaitez-vous réserver un horaire ?’. "
                 "IMPORTANT : Quand tu dois consulter une information qui peut prendre du temps (comme vérifier le calendrier avec `list_available_slots`), annonce-le d’abord. Par exemple : ‘Un instant, je consulte les disponibilités pour vous.’ puis appelle la fonction. "
-                "Une fois que tu as la liste des créneaux, NE LA LIS PAS EN ENTIER. Synthétise-la en proposant des options générales. Par exemple : 'J\'ai plusieurs créneaux disponibles en début de semaine prochaine, notamment lundi matin et mardi après-midi.' ou 'Je vois des disponibilités pour jeudi en fin de journée.' Ensuite, demande à l\'utilisateur ce qui l\'arrangerait pour affiner la recherche. "
+                "Une fois que tu as la liste des créneaux, NE LA LIS PAS EN ENTIER. Synthétise-la en proposant des options générales. Par exemple : 'J'ai plusieurs créneaux disponibles en début de semaine prochaine, notamment lundi matin et mardi après-midi.' ou 'Je vois des disponibilités pour jeudi en fin de journée.' Ensuite, demande à l\'utilisateur ce qui l\'arrangerait pour affiner la recherche. "
                 "Formule des créneaux comme ‘lundi en fin de matinée’ ou ‘mardi en début d’après-midi’ — évite les fuseaux horaires, les timestamps, et évite de dire ‘AM’ ou ‘PM’. "
                 "Ne mentionne l’année que si elle est différente de l’année en cours. "
                 "Propose quelques options à la fois, marque une pause pour la réponse, puis guide l’utilisateur vers la confirmation. "
@@ -92,41 +92,44 @@ class FrontDeskAgent(Agent):
         self,
         ctx: RunContext[Userdata],
         slot_id: str,
+        user_name: str,
+        user_email: str,
+        user_phone_number: str,
     ) -> str | None:
         """
-        Schedule an appointment at the given slot.
+        Schedule an appointment at the given slot using the user's information.
 
         Args:
-            slot_id: The identifier for the selected time slot (as shown in the list of available slots).
+            slot_id: The identifier for the selected time slot.
+            user_name: The full name of the user.
+            user_email: The email address of the user.
+            user_phone_number: The phone number of the user.
         """
         if not (slot := self._slots_map.get(slot_id)):
             raise ToolError(f"error: slot {slot_id} was not found")
 
-        # Disable interruptions at the beginning to prevent workflow issues
         ctx.disallow_interruptions()
         
         try:
-            # Collect all information without allowing interruptions
-            email_result = await beta.workflows.GetEmailTask(chat_ctx=self.chat_ctx)
-            phone_result = await GetPhoneNumberTask(chat_ctx=self.chat_ctx)
-            name_result = await GetUserNameTask(chat_ctx=self.chat_ctx)
+            # The user information is now passed directly as arguments.
+            # No need to call the workflows here anymore.
             
-            # Schedule the appointment
             await ctx.userdata.cal.schedule_appointment(
                 start_time=slot.start_time,
-                attendee_email=email_result.email_address,
-                user_name=name_result.name,
+                attendee_email=user_email,
+                user_name=user_name,
             )
             
-            # Send SMS confirmation in German
             local = slot.start_time.astimezone(self.tz)
             appointment_details = f"{local.strftime('%A, %B %d, %Y at %H:%M %Z')}"
+            
+            # Use the provided phone number to send the SMS
             sms_sent = sms_manager.send_confirmation_sms(
-                phone_result.phone_number, appointment_details, language="de"
+                user_phone_number, appointment_details, language="de"
             )
 
             confirmation_message = (
-                f"Vielen Dank, {name_result.name}. Der Termin wurde erfolgreich für {appointment_details} vereinbart."
+                f"Vielen Dank, {user_name}. Der Termin wurde erfolgreich für {appointment_details} vereinbart."
             )
             if sms_sent:
                 confirmation_message += (
@@ -140,12 +143,8 @@ class FrontDeskAgent(Agent):
             return confirmation_message
             
         except SlotUnavailableError:
-            # Re-enable interruptions before raising error
-            ctx.allow_interruptions()
             raise ToolError("This slot isn't available anymore") from None
         except Exception as e:
-            # Re-enable interruptions in case of any other error
-            ctx.allow_interruptions()
             logger.error(f"Erreur lors de la réservation: {e}")
             raise ToolError(f"Je rencontre un problème technique lors de la réservation. Pouvez-vous réessayer ?") from None
 

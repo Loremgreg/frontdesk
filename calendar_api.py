@@ -186,7 +186,7 @@ class CalComCalendar(Calendar):
             "attendee": {
                 "name": user_name,
                 "email": attendee_email,
-                "timeZone": self.tz.tzname(None),
+                "timeZone": self.tz.key,
             },
             "eventTypeId": self._lk_event_id,
         }
