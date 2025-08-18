@@ -1,6 +1,6 @@
 # Directives pour le projet Voice-Assistant
 
-Ce document fournit les instructions et le contexte nécessaires pour travailler sur ce projet d'assistant vocal.
+Ce document fournit les instructions et le contexte nécessaires pour travailler sur ce projet d'assistant vocal
 
 ## 1. Contexte du Projet
 
