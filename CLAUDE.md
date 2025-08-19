@@ -2,7 +2,7 @@
 
 ## 🎯 **Objectif du Projet**
 
-Ce projet implémente un **assistant vocal intelligent pour salons de coiffure** utilisant l'IA pour automatiser l'accueil téléphonique et la prise de rendez-vous. L'assistant peut répondre aux questions fréquentes, gérer les réservations via Cal.com, et envoyer des confirmations SMS.
+Ce projet implémente un **assistant vocal intelligent pour entreprise** utilisant l'IA pour automatiser l'accueil téléphonique et la prise de rendez-vous. L'assistant peut répondre aux questions fréquentes, gérer les réservations via Cal.com, et envoyer des confirmations SMS.
 
 ## 🏗️ **Architecture Générale**
 

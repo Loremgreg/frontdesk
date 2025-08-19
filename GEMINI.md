@@ -4,7 +4,7 @@ Ce document fournit les instructions et le contexte nécessaires pour travailler
 
 ## 1. Contexte du Projet
 
-- **Objectif :** Créer un assistant vocal intelligent pour salons de coiffures. 
+- **Objectif :** Créer un assistant vocal intelligent pour entreprises. 
 - **Fonctionnalités Clés :**
   1. **Accueil téléphonique automatique**  
      - Répondre aux appels entrants 24h/24 avec un message personnalisé.  
